@@ -55,7 +55,7 @@ class PredictionInput(BaseModel):
 class PredictionOutput(BaseModel):
     prediction: str
     raw_output: int
-    probability: float
+    probability_percent: str
 
 # ─── Endpoint Root ─────────────────────────────────────────────────────
 @app.get("/", status_code=200)
@@ -82,19 +82,20 @@ async def predict_diabetes(data: PredictionInput):
 
     try:
         input_array = np.array([[data.Age, data.BMI, data.Glucose, data.Insulin, data.BloodPressure]])
-        logger.info(f"📥 Data diterima untuk prediksi: {input_array.tolist()}")
+        logger.info(f"📥 Input diterima: {data.dict()}")
 
         input_scaled = scaler.transform(input_array)
         probability = float(model.predict(input_scaled)[0][0])
         prediction = int(probability > 0.5)
         label = "Diabetes" if prediction == 1 else "Tidak Diabetes"
+        percent = round(probability * 100, 2)
 
-        logger.info(f"📤 Prediksi: {label} (Probabilitas: {probability:.4f})")
+        logger.info(f"📤 Prediksi: {label} | Probabilitas: {percent}%")
 
         return {
             "prediction": label,
             "raw_output": prediction,
-            "probability": round(probability, 4)
+            "probability_percent": f"{percent}%"
         }
     except Exception as e:
         logger.error(f"❌ Gagal melakukan prediksi: {e}")
