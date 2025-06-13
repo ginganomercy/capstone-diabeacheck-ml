@@ -3,5 +3,6 @@ pydantic
 uvicorn
 joblib
 scikit-learn
+numpy
 pandas
 tensorflow-cpu
