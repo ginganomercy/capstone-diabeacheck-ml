@@ -17,27 +17,29 @@ MODEL_DIR = 'model_artifacts'
 MODEL_PATH = os.path.join(MODEL_DIR, 'diabetes_mlp_model.h5')
 SCALER_PATH = os.path.join(MODEL_DIR, 'scaler.joblib')
 
+model = None
+scaler = None
+
 # ─── Fungsi untuk Load Model dan Scaler ────────────────────────────────
-def load_artifacts(model_path: str, scaler_path: str):
+def load_artifacts():
+    global model, scaler
     try:
-        model = load_model(model_path)
-        scaler = joblib.load(scaler_path)
+        model = load_model(MODEL_PATH)
+        scaler = joblib.load(SCALER_PATH)
         logger.info("✅ Model dan Scaler berhasil dimuat.")
-        return model, scaler
     except FileNotFoundError as e:
         logger.error(f"❌ File tidak ditemukan: {e}")
     except Exception as e:
         logger.error(f"❌ Gagal memuat model/scaler: {e}")
-    return None, None
 
-# ─── Load Artifacts ────────────────────────────────────────────────────
-model, scaler = load_artifacts(MODEL_PATH, SCALER_PATH)
+# ─── Panggil Fungsi Saat Startup ───────────────────────────────────────
+load_artifacts()
 
 # ─── Inisialisasi FastAPI ─────────────────────────────────────────────
 app = FastAPI(
     title="DiabeaCheck API",
     version="1.0",
-    description="🎯 API untuk mendeteksi dini risiko diabetes menggunakan model MLP.",
+    description="🎯 API untuk deteksi dini risiko diabetes menggunakan model MLP.",
     contact={
         "name": "Tim DiabeaCheck",
         "email": "diabeacheck@dbs.academy"
@@ -47,7 +49,7 @@ app = FastAPI(
 # ─── Middleware CORS ───────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Ganti "*" dengan domain frontend kamu kalau perlu
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -55,7 +57,7 @@ app.add_middleware(
 
 # ─── Schema Input ──────────────────────────────────────────────────────
 class PredictionInput(BaseModel):
-    Age: int = Field(..., ge=0, le=120, example=0)
+    Age: int = Field(..., ge=0, le=120)
     BMI: float = Field(..., ge=0)
     Glucose: float = Field(..., ge=0)
     Insulin: float = Field(..., ge=0)
@@ -82,40 +84,23 @@ async def read_root():
 # ─── Endpoint Health Check ─────────────────────────────────────────────
 @app.get("/health", status_code=200)
 async def health_check():
-    if model and scaler:
+    if model is not None and scaler is not None:
+        logger.info("✅ Health check sukses")
         return {"status": "ok", "message": "Model dan Scaler tersedia"}
     else:
-        return {"status": "error", "message": "Model atau Scaler tidak dimuat dengan benar"}
+        logger.error("❌ Model/Scaler tidak tersedia saat health check")
+        raise HTTPException(status_code=500, detail="Model atau Scaler tidak tersedia.")
 
 # ─── Endpoint Prediksi ─────────────────────────────────────────────────
 @app.post("/predict/", response_model=PredictionOutput, status_code=200)
 async def predict_diabetes(data: PredictionInput):
     if model is None or scaler is None:
-        raise HTTPException(status_code=500, detail="Model atau scaler gagal dimuat saat startup.")
+        raise HTTPException(status_code=500, detail="Model atau Scaler belum dimuat.")
 
     try:
-        # Konversi ke dict untuk manipulasi nilai
-        data_dict = data.dict()
+        input_array = np.array([[data.Age, data.BMI, data.Glucose, data.Insulin, data.BloodPressure]])
+        logger.info(f"📥 Input diterima: {data.dict()}")
 
-        # Fungsi bantu untuk parsing float dengan koma
-        def parse_value(val):
-            if isinstance(val, str):
-                val = val.replace(",", ".")
-            return float(val)
-
-        # Parsing nilai input
-        age = data_dict['Age']
-        bmi = parse_value(data_dict['BMI'])
-        glucose = parse_value(data_dict['Glucose'])
-        insulin = parse_value(data_dict['Insulin'])
-        blood_pressure = data_dict['BloodPressure']
-
-        # Siapkan input array
-        input_array = np.array([[age, bmi, glucose, insulin, blood_pressure]])
-
-        logger.info(f"📥 Input diterima: {data_dict}")
-
-        # Transformasi dan prediksi
         input_scaled = scaler.transform(input_array)
         probability = float(model.predict(input_scaled)[0][0])
         prediction = int(probability > 0.5)
@@ -131,5 +116,5 @@ async def predict_diabetes(data: PredictionInput):
         }
 
     except Exception as e:
-        logger.error(f"❌ Gagal melakukan prediksi: {e}")
+        logger.error(f"❌ Error saat prediksi: {e}")
         raise HTTPException(status_code=500, detail="Terjadi kesalahan saat melakukan prediksi.")
