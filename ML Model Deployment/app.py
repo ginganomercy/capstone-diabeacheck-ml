@@ -45,7 +45,7 @@ app = FastAPI(
 
 # ─── Schema Input ──────────────────────────────────────────────────────
 class PredictionInput(BaseModel):
-    Age: int = Field(..., ge=0, le=120, example=25)
+    Age: int = Field(..., ge=0, le=120, example=0)
     BMI: float = Field(..., ge=0)
     Glucose: float = Field(..., ge=0)
     Insulin: float = Field(..., ge=0)
