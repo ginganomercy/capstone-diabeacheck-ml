@@ -1,6 +1,4 @@
-
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import joblib
 import numpy as np
@@ -45,15 +43,6 @@ app = FastAPI(
     }
 )
 
-# ─── Middleware CORS ───────────────────────────────────────────────────
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Ganti "*" dengan domain frontend kamu kalau perlu
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # ─── Schema Input ──────────────────────────────────────────────────────
 class PredictionInput(BaseModel):
     Age: int = Field(..., ge=0, le=120, example=0)
@@ -61,6 +50,8 @@ class PredictionInput(BaseModel):
     Glucose: float = Field(..., ge=0)
     Insulin: float = Field(..., ge=0)
     BloodPressure: int = Field(..., ge=0)
+
+    # Opsi tambahan yang tidak wajib
     Pregnancies: Optional[int] = Field(None, ge=0)
     SkinThickness: Optional[float] = Field(None, ge=0)
     DiabetesPedigreeFunction: Optional[float] = Field(None, ge=0)
@@ -104,7 +95,7 @@ async def predict_diabetes(data: PredictionInput):
                 val = val.replace(",", ".")
             return float(val)
 
-        # Parsing nilai input
+        # Parsing nilai input (wajib)
         age = data_dict['Age']
         bmi = parse_value(data_dict['BMI'])
         glucose = parse_value(data_dict['Glucose'])
