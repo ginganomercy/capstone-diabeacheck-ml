@@ -51,6 +51,11 @@ class PredictionInput(BaseModel):
     Insulin: float = Field(..., ge=0)
     BloodPressure: int = Field(..., ge=0)
 
+    # Opsi tambahan yang tidak wajib
+    Pregnancies: Optional[int] = Field(None, ge=0)
+    SkinThickness: Optional[float] = Field(None, ge=0)
+    DiabetesPedigreeFunction: Optional[float] = Field(None, ge=0)
+
 # ─── Schema Output ─────────────────────────────────────────────────────
 class PredictionOutput(BaseModel):
     prediction: str
