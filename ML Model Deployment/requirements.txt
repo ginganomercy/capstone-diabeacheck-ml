@@ -4,3 +4,4 @@ uvicorn
 joblib
 scikit-learn
 pandas
+tensorflow-cpu
