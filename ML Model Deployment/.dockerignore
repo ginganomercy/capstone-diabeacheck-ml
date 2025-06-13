@@ -2,13 +2,9 @@ __pycache__/
 *.pyc
 *.pyo
 *.pkl
-*.joblib
-*.h5
 *.log
 .env
 venv/
 .git/
 .gitignore
 data/
-model_artifacts/diabetes_mlp_model.h5
-model_artifacts/scaler.joblib
