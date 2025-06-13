@@ -1,8 +1,6 @@
 fastapi
-pydantic
 uvicorn
 joblib
-scikit-learn
 numpy
-pandas
-tensorflow-cpu
+tensorflow-cpu==2.10.0
+scikit-learn
