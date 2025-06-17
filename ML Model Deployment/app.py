@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # ─── Path Model & Scaler ───────────────────────────────────────────────
 MODEL_DIR = 'model_artifacts'
-MODEL_PATH = os.path.join(MODEL_DIR, 'diabetes_mlp_model.keras')
+MODEL_PATH = os.path.join(MODEL_DIR, 'diabetes_mlp_model.h5')
 SCALER_PATH = os.path.join(MODEL_DIR, 'scaler.joblib')
 
 # ─── Fungsi untuk Load Model dan Scaler ────────────────────────────────
