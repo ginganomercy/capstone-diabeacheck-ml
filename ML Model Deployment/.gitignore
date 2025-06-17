@@ -21,11 +21,6 @@ venv/
 .DS_Store
 
 # ================================
-# Dataset Lokal
-# ================================
-data/
-
-# ================================
 # Docker & Compose Overrides
 # ================================
 docker-compose.override.yml
