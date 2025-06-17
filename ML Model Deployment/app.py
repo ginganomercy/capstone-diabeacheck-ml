@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # ─── Path Model & Scaler ───────────────────────────────────────────────
 MODEL_DIR = 'model_artifacts'
-MODEL_PATH = os.path.join(MODEL_DIR, 'diabetes_mlp_model.h5')
+MODEL_PATH = os.path.join(MODEL_DIR, 'diabetes_mlp_model.keras')
 SCALER_PATH = os.path.join(MODEL_DIR, 'scaler.joblib')
 
 # ─── Fungsi untuk Load Model dan Scaler ────────────────────────────────
@@ -29,29 +29,24 @@ def load_artifacts(model_path: str, scaler_path: str):
         logger.error(f"❌ Gagal memuat model/scaler: {e}")
     return None, None
 
-# ─── Load Artifacts ────────────────────────────────────────────────────
+# ─── Load Model dan Scaler ─────────────────────────────────────────────
 model, scaler = load_artifacts(MODEL_PATH, SCALER_PATH)
 
 # ─── Inisialisasi FastAPI ─────────────────────────────────────────────
 app = FastAPI(
     title="DiabeaCheck API",
     version="1.0",
-    description="🎯 API untuk mendeteksi dini risiko diabetes menggunakan model MLP.",
-    contact={
-        "name": "Tim DiabeaCheck",
-        "email": "diabeacheck@dbs.academy"
-    }
+    description="🎯 API untuk deteksi dini risiko diabetes menggunakan model MLP.",
+    contact={"name": "Tim DiabeaCheck", "email": "diabeacheck@dbs.academy"}
 )
 
 # ─── Schema Input ──────────────────────────────────────────────────────
 class PredictionInput(BaseModel):
-    Age: int = Field(..., ge=0, le=120, example=0)
+    Age: int = Field(..., ge=0, le=120)
     BMI: float = Field(..., ge=0)
     Glucose: float = Field(..., ge=0)
     Insulin: float = Field(..., ge=0)
     BloodPressure: int = Field(..., ge=0)
-
-    # Opsi tambahan yang tidak wajib
     Pregnancies: Optional[int] = Field(None, ge=0)
     SkinThickness: Optional[float] = Field(None, ge=0)
     DiabetesPedigreeFunction: Optional[float] = Field(None, ge=0)
@@ -66,62 +61,59 @@ class PredictionOutput(BaseModel):
 @app.get("/", status_code=200)
 async def read_root():
     return {
-        "message": "🎯 DiabeaCheck API - Deteksi Dini Risiko Diabetes menggunakan MLP Model",
+        "message": "🎯 DiabeaCheck API - Prediksi Risiko Diabetes",
         "health": "/health",
         "predict": "/predict"
     }
 
-# ─── Endpoint Health Check ─────────────────────────────────────────────
+# ─── Endpoint Kesehatan Sistem ─────────────────────────────────────────
 @app.get("/health", status_code=200)
 async def health_check():
-    if model and scaler:
+    if model is not None and scaler is not None:
         return {"status": "ok", "message": "Model dan Scaler tersedia"}
-    else:
-        return {"status": "error", "message": "Model atau Scaler tidak dimuat dengan benar"}
+    return {"status": "error", "message": "Model atau Scaler tidak tersedia"}
 
 # ─── Endpoint Prediksi ─────────────────────────────────────────────────
 @app.post("/predict/", response_model=PredictionOutput, status_code=200)
 async def predict_diabetes(data: PredictionInput):
     if model is None or scaler is None:
-        raise HTTPException(status_code=500, detail="Model atau scaler gagal dimuat saat startup.")
+        raise HTTPException(status_code=500, detail="Model atau Scaler tidak tersedia")
 
     try:
-        # Konversi ke dict untuk manipulasi nilai
-        data_dict = data.dict()
+        # Ambil data input
+        input_data = [
+            float(str(data.Age).replace(",", ".")),
+            float(str(data.BMI).replace(",", ".")),
+            float(str(data.Glucose).replace(",", ".")),
+            float(str(data.Insulin).replace(",", ".")),
+            float(str(data.BloodPressure).replace(",", "."))
+        ]
 
-        # Fungsi bantu untuk parsing float dengan koma
-        def parse_value(val):
-            if isinstance(val, str):
-                val = val.replace(",", ".")
-            return float(val)
+        logger.info(f"📥 Data diterima: {input_data}")
+        input_array = np.array([input_data])
 
-        # Parsing nilai input (wajib)
-        age = data_dict['Age']
-        bmi = parse_value(data_dict['BMI'])
-        glucose = parse_value(data_dict['Glucose'])
-        insulin = parse_value(data_dict['Insulin'])
-        blood_pressure = data_dict['BloodPressure']
+        # Scaling
+        try:
+            input_scaled = scaler.transform(input_array)
+        except Exception as scale_err:
+            logger.error(f"❌ Error saat scaling: {scale_err}")
+            raise HTTPException(status_code=500, detail="Kesalahan saat scaling data")
 
-        # Siapkan input array
-        input_array = np.array([[age, bmi, glucose, insulin, blood_pressure]])
-
-        logger.info(f"📥 Input diterima: {data_dict}")
-
-        # Transformasi dan prediksi
-        input_scaled = scaler.transform(input_array)
-        probability = float(model.predict(input_scaled)[0][0])
-        prediction = int(probability > 0.5)
-        label = "Diabetes" if prediction == 1 else "Tidak Diabetes"
-        percent = round(probability * 100, 2)
+        # Prediksi
+        prob = model.predict(input_scaled)
+        prob_val = float(prob[0][0]) if prob.shape[-1] == 1 else float(prob[0])
+        pred = int(prob_val > 0.5)
+        label = "Diabetes" if pred == 1 else "Tidak Diabetes"
+        percent = round(prob_val * 100, 2)
 
         logger.info(f"📤 Prediksi: {label} | Probabilitas: {percent}%")
 
         return {
             "prediction": label,
-            "raw_output": prediction,
+            "raw_output": pred,
             "probability_percent": f"{percent}%"
         }
 
     except Exception as e:
         logger.error(f"❌ Gagal melakukan prediksi: {e}")
-        raise HTTPException(status_code=500, detail="Terjadi kesalahan saat melakukan prediksi.")
+        raise HTTPException(status_code=500, detail="Terjadi kesalahan saat memproses prediksi")
