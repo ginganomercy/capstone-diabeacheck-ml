@@ -24,6 +24,9 @@ RUN pip install -r requirements.txt
 # Salin seluruh isi project ke dalam container
 COPY . .
 
+COPY model_artifacts/ model_artifacts/
+
+
 # Tambahkan user non-root
 RUN adduser --disabled-password myuser
 USER myuser
